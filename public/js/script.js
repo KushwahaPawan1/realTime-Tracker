@@ -7,6 +7,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 const markers = {};
+const paths = {};
 
 // Green Marker (Current User)
 const greenIcon = new L.Icon({
@@ -56,7 +57,6 @@ socket.on("receive-location", (data) => {
 
     map.setView([latitude, longitude]);
 
-    // Apna marker green, baaki sab red
     const icon = (id === socket.id) ? greenIcon : redIcon;
 
     if (markers[id]) {
@@ -70,6 +70,16 @@ socket.on("receive-location", (data) => {
             id === socket.id ? "🟢 You" : "🔴 Other User"
         );
     }
+
+    // Route History
+    if (!paths[id]) {
+        paths[id] = L.polyline([[latitude, longitude]], {
+          color: id === socket.id ? "green" : "red",
+           weight: 4
+    }).addTo(map);
+    } else {
+        paths[id].addLatLng([latitude, longitude]);
+    }
 });
 
 // Remove disconnected users
@@ -77,5 +87,10 @@ socket.on("user-disconnected", (id) => {
     if (markers[id]) {
         map.removeLayer(markers[id]);
         delete markers[id];
+    }
+
+    if (paths[id]) {
+        map.removeLayer(paths[id]);
+        delete paths[id];
     }
 });
