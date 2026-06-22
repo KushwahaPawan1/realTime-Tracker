@@ -8,6 +8,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const markers = {};
 const paths = {};
+
 let totalDistance = 0;
 let lastPosition = null;
 
@@ -31,7 +32,8 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-  function calculateDistance(lat1, lon1, lat2, lon2) {
+// Distance Calculator
+function calculateDistance(lat1, lon1, lat2, lon2) {
     return map.distance([lat1, lon1], [lat2, lon2]);
 }
 
@@ -39,29 +41,37 @@ const redIcon = new L.Icon({
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
         (position) => {
-           const { latitude, longitude, speed } = position.coords;
+            const { latitude, longitude, speed } = position.coords;
 
-if (lastPosition) {
-    totalDistance += calculateDistance(
-        lastPosition.latitude,
-        lastPosition.longitude,
-        latitude,
-        longitude
-    );
+            // Distance
+            if (lastPosition) {
+                totalDistance += calculateDistance(
+                    lastPosition.latitude,
+                    lastPosition.longitude,
+                    latitude,
+                    longitude
+                );
 
-    document.getElementById("distance").textContent =
-        totalDistance.toFixed(0);
-}
+                const distanceElement = document.getElementById("distance");
+                if (distanceElement) {
+                    distanceElement.textContent = totalDistance.toFixed(0);
+                }
+            }
 
-lastPosition = { latitude, longitude };
+            lastPosition = { latitude, longitude };
 
-document.getElementById("speed").textContent =
-    speed ? (speed * 3.6).toFixed(1) : 0;
+            // Speed
+            const speedElement = document.getElementById("speed");
 
-socket.emit("send-location", {
-    latitude,
-    longitude
-});
+            if (speedElement) {
+                speedElement.textContent =
+                    speed ? (speed * 3.6).toFixed(1) : "0";
+            }
+
+            socket.emit("send-location", {
+                latitude,
+                longitude
+            });
         },
         (error) => {
             console.error(error);
@@ -78,10 +88,9 @@ socket.emit("send-location", {
 socket.on("receive-location", (data) => {
     const { id, latitude, longitude } = data;
 
-    map.setView([latitude, longitude]);
-
     const icon = (id === socket.id) ? greenIcon : redIcon;
 
+    // Marker Update
     if (markers[id]) {
         markers[id].setLatLng([latitude, longitude]);
     } else {
@@ -97,11 +106,25 @@ socket.on("receive-location", (data) => {
     // Route History
     if (!paths[id]) {
         paths[id] = L.polyline([[latitude, longitude]], {
-          color: id === socket.id ? "green" : "red",
-           weight: 4
-    }).addTo(map);
+            color: id === socket.id ? "green" : "red",
+            weight: 4
+        }).addTo(map);
     } else {
         paths[id].addLatLng([latitude, longitude]);
+    }
+
+    // Auto Fit Map
+    const group = [];
+
+    for (let markerId in markers) {
+        group.push(markers[markerId].getLatLng());
+    }
+
+    if (group.length > 0) {
+        map.fitBounds(group, {
+            padding: [50, 50],
+            maxZoom: 16
+        });
     }
 });
 
@@ -116,8 +139,26 @@ socket.on("user-disconnected", (id) => {
         map.removeLayer(paths[id]);
         delete paths[id];
     }
+
+    const group = [];
+
+    for (let markerId in markers) {
+        group.push(markers[markerId].getLatLng());
+    }
+
+    if (group.length > 0) {
+        map.fitBounds(group, {
+            padding: [50, 50],
+            maxZoom: 16
+        });
+    }
 });
 
+// Users Online
 socket.on("users-online", (count) => {
-    document.getElementById("online-count").textContent = count;
+    const onlineElement = document.getElementById("online-count");
+
+    if (onlineElement) {
+        onlineElement.textContent = count;
+    }
 });
