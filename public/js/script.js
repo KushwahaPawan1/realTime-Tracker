@@ -8,6 +8,8 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const markers = {};
 const paths = {};
+let totalDistance = 0;
+let lastPosition = null;
 
 // Green Marker (Current User)
 const greenIcon = new L.Icon({
@@ -29,16 +31,37 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    return map.distance([lat1, lon1], [lat2, lon2]);
+}
+
 // Send Location
 if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
         (position) => {
-            const { latitude, longitude } = position.coords;
+           const { latitude, longitude, speed } = position.coords;
 
-            socket.emit("send-location", {
-                latitude,
-                longitude
-            });
+if (lastPosition) {
+    totalDistance += calculateDistance(
+        lastPosition.latitude,
+        lastPosition.longitude,
+        latitude,
+        longitude
+    );
+
+    document.getElementById("distance").textContent =
+        totalDistance.toFixed(0);
+}
+
+lastPosition = { latitude, longitude };
+
+document.getElementById("speed").textContent =
+    speed ? (speed * 3.6).toFixed(1) : 0;
+
+socket.emit("send-location", {
+    latitude,
+    longitude
+});
         },
         (error) => {
             console.error(error);
@@ -93,4 +116,8 @@ socket.on("user-disconnected", (id) => {
         map.removeLayer(paths[id]);
         delete paths[id];
     }
+});
+
+socket.on("users-online", (count) => {
+    document.getElementById("online-count").textContent = count;
 });
